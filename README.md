@@ -32,6 +32,7 @@ This project represents **Day 1** of the Personal Coding Coach concept: a tool d
 **Step 1: Clone repository**
 
 git clone https://github.com/Evina88/personal-coach-api/
+
 cd personal-coach-api
 
 **Step 2: Install dependencies**
