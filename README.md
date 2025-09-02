@@ -60,7 +60,12 @@ php artisan serve
 
 Testing the API
 
+Register
+
 <img width="859" height="661" alt="image" src="https://github.com/user-attachments/assets/ac5f9bc4-cd2c-425e-a5ba-70ba559a8a63" />
+
+
+Get user
 
 <img width="851" height="650" alt="image" src="https://github.com/user-attachments/assets/c23858ef-f70c-4dd6-aa91-6ec8918c93d6" />
 
