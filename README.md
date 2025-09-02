@@ -65,3 +65,30 @@ Testing the API
 <img width="851" height="650" alt="image" src="https://github.com/user-attachments/assets/c23858ef-f70c-4dd6-aa91-6ec8918c93d6" />
 
 
+Login
+
+<img width="1375" height="895" alt="image" src="https://github.com/user-attachments/assets/5a8b6055-6a38-4509-a493-7a27067b64db" />
+
+
+Patch for updating password
+
+<img width="1402" height="807" alt="image" src="https://github.com/user-attachments/assets/cb991a51-ddd9-4554-951a-a950af6994c6" />
+
+
+Create exercice
+
+<img width="1382" height="837" alt="image" src="https://github.com/user-attachments/assets/857e9226-402c-47e2-b52b-f56959ec03b2" />
+
+
+Get exercises
+
+<img width="1377" height="895" alt="image" src="https://github.com/user-attachments/assets/b2529358-d752-4fec-a7fc-84633bf5cff7" />
+
+Patch Exercise 
+
+<img width="1367" height="850" alt="image" src="https://github.com/user-attachments/assets/59dc3d5c-c10f-4332-b841-c82ffed22b65" />
+
+
+
+
+
