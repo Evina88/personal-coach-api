@@ -55,7 +55,7 @@ php artisan migrate
 
 php artisan serve
 
-
+---
 
 
 Testing the API
@@ -69,9 +69,9 @@ Login
 
 <img width="1375" height="895" alt="image" src="https://github.com/user-attachments/assets/5a8b6055-6a38-4509-a493-7a27067b64db" />
 
+---
 
-
-🚀 Features (Day 2)
+## 🚀 Features (Day 2)
 
 ✅ CRUD operations for exercises (create, read, update, delete)
 
@@ -79,6 +79,7 @@ Login
 
 🧪 Fully tested with Postman requests
 
+---
 
 Patch for updating password
 
@@ -97,6 +98,8 @@ Get exercises
 Patch Exercise 
 
 <img width="1367" height="850" alt="image" src="https://github.com/user-attachments/assets/59dc3d5c-c10f-4332-b841-c82ffed22b65" />
+
+---
 
 
 
