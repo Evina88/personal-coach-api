@@ -70,6 +70,16 @@ Login
 <img width="1375" height="895" alt="image" src="https://github.com/user-attachments/assets/5a8b6055-6a38-4509-a493-7a27067b64db" />
 
 
+
+🚀 Features (Day 2)
+
+✅ CRUD operations for exercises (create, read, update, delete)
+
+🛠️ Patch password API
+
+🧪 Fully tested with Postman requests
+
+
 Patch for updating password
 
 <img width="1402" height="807" alt="image" src="https://github.com/user-attachments/assets/cb991a51-ddd9-4554-951a-a950af6994c6" />
