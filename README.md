@@ -35,17 +35,28 @@ git clone https://github.com/Evina88/personal-coach-api/
 
 cd personal-coach-api
 
+
 **Step 2: Install dependencies**
+
 composer install
 
+
 **Step 3: Configure environment**
+
 In .env file set your database credentials.
 
+
 **Step 4: Run migrations**
+
 php artisan migrate
 
+
 **Step 5: Start the server**
+
 php artisan serve
+
+
+
 
 Testing the API
 
