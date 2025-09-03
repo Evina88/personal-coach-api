@@ -2,118 +2,106 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Challenge;
-use App\Services\GitHubService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Str;
+use App\Services\GitHubService;
 
 class ChallengeController extends Controller
 {
     public function __construct(protected GitHubService $github) {}
 
-    // POST /api/challenges/sync
-    public function sync(Request $request)
+    /**
+     * GET /api/challenges/search?lang=php&level=easy&limit=5
+     * Live GitHub search: finds challenge markdown files across repos.
+     */
+    public function search(Request $request)
     {
-        $owner = env('GITHUB_OWNER', 'Evina88');
-        $repo  = env('GITHUB_REPO', 'coding-challenges');
-
-        $files = $this->github->fetchChallenges($owner, $repo);
-
-        if (!is_array($files) || empty($files)) {
-            return response()->json([
-                'message' => 'No files found in the GitHub repo (or the repo is empty).',
-                'imported' => 0
-            ]);
-        }
-
-        $imported = 0;
-
-        foreach ($files as $file) {
-            if (($file['type'] ?? '') !== 'file') continue;
-
-            $name = $file['name'] ?? '';
-            // Parse difficulty from filename, e.g. "01-easy-two-sum.md"
-            preg_match('/(easy|medium|hard)/i', $name, $m);
-            $difficulty = isset($m[1]) ? strtolower($m[1]) : null;
-
-            // Derive a nice title and slug
-            $title = trim(preg_replace('/^\d+\-?(easy|medium|hard)?\-?/i', '', $name));
-            $title = preg_replace('/\.md$/i', '', $title);
-            $title = str_replace('-', ' ', $title);
-            $title = ucwords($title);
-            $slug  = Str::slug($title);
-
-            Challenge::updateOrCreate(
-                ['slug' => $slug],
-                [
-                    'title'       => $title,
-                    'difficulty'  => $difficulty,
-                    'github_path' => $file['path'] ?? null,
-                    'github_url'  => $file['html_url'] ?? null,
-                ]
-            );
-
-            $imported++;
-        }
-
-        return response()->json([
-            'message'  => "Sync complete.",
-            'imported' => $imported,
-        ]);
-    }
-
-    // GET /api/challenges
-    public function index()
-    {
-        return Challenge::orderBy('difficulty')->orderBy('title')->get();
-    }
-
-    // POST /api/challenges/{id}/complete
-    public function complete(Request $request, int $id)
-    {
-        $challenge = Challenge::findOrFail($id);
-        $request->user()->challenges()->syncWithoutDetaching([
-            $challenge->id => ['completed' => true],
+        $request->validate([
+            'lang'  => 'required|string|max:40',
+            'level' => 'nullable|in:easy,medium,hard',
+            'limit' => 'nullable|integer|min:1|max:50',
         ]);
 
-        return response()->json(['message' => 'Challenge marked as completed.']);
+        $lang  = strtolower($request->query('lang'));
+        $level = $request->query('level');
+        $limit = (int) $request->query('limit', 5);
+
+        // Pull a pool of candidates from GitHub (broader pool helps filtering)
+        $pool = $this->github->findChallengesByLanguage($lang, repoLimit: 5, filesPerRepo: 8);
+
+        // If a level is requested, filter by inferred difficulty.
+        // If that yields nothing, gracefully fall back to the unfiltered pool.
+        if ($level) {
+            $filtered = array_values(array_filter(
+                $pool,
+                fn ($c) => ($c['difficulty'] ?? null) === $level
+            ));
+            if (!empty($filtered)) {
+                $pool = $filtered;
+            }
+        }
+
+        return response()->json(array_slice($pool, 0, $limit));
     }
 
-    // GET /api/challenges/suggest
+    /**
+     * GET /api/challenges/suggest
+     * Suggest a single challenge based on user's languages and history.
+     * - language: first from ?lang, else user's languages_learning, else 'php'
+     * - level:    derived from user's completed count (if you track it), else defaults 'easy'
+     */
     public function suggest(Request $request)
     {
         $user = $request->user();
-        $completedCount = $user->challenges()->wherePivot('completed', true)->count();
 
-        $targetDifficulty = match (true) {
+        // Language preference: explicit ?lang, else first in user's languages_learning, else 'php'
+        $explicitLang = $request->query('lang');
+        if ($explicitLang) {
+            $lang = strtolower(trim($explicitLang));
+        } elseif ($user && $user->languages_learning) {
+            $langs = array_values(array_filter(array_map('trim', explode(',', $user->languages_learning))));
+            $lang  = strtolower($langs[0] ?? 'php');
+        } else {
+            $lang = 'php';
+        }
+
+        // Completed count if you already track it via pivot; otherwise default to 0
+        $completedCount = 0;
+        if ($user && method_exists($user, 'challenges')) {
+            $completedCount = (int) $user->challenges()->wherePivot('completed', true)->count();
+        }
+
+        // Target difficulty based on simple progression heuristic
+        $targetLevel = match (true) {
             $completedCount < 3 => 'easy',
             $completedCount < 7 => 'medium',
-            default              => 'hard',
+            default             => 'hard',
         };
 
-        $suggestion = Challenge::whereDoesntHave('users', function ($q) use ($user) {
-                $q->where('user_id', $user->id)->where('completed', true);
-            })
-            ->when($targetDifficulty, fn($q) => $q->where('difficulty', $targetDifficulty))
-            ->orderBy('title')
-            ->first();
+        // Fetch candidates from GitHub and try to match target level; fall back if none
+        $pool = $this->github->findChallengesByLanguage($lang, repoLimit: 5, filesPerRepo: 8);
 
-        if (!$suggestion) {
-            $suggestion = Challenge::whereDoesntHave('users', function ($q) use ($user) {
-                    $q->where('user_id', $user->id)->where('completed', true);
-                })
-                ->orderBy('difficulty')
-                ->orderBy('title')
-                ->first();
+        $candidates = array_values(array_filter(
+            $pool,
+            fn ($c) => ($c['difficulty'] ?? null) === $targetLevel
+        ));
+        if (empty($candidates)) {
+            $candidates = $pool; // fall back to any difficulty
         }
 
-        if (!$suggestion) {
-            return response()->json(['message' => 'All challenges completed. 🎉']);
+        if (empty($candidates)) {
+            return response()->json([
+                'language' => $lang,
+                'target_level' => $targetLevel,
+                'message' => 'No challenges found on GitHub for this language.'
+            ]);
         }
 
+        // For now, return the first candidate; we can randomize/diversify later
         return response()->json([
-            'target_difficulty' => $targetDifficulty,
-            'challenge'         => $suggestion,
+            'language'       => $lang,
+            'target_level'   => $targetLevel,
+            'completed_count'=> $completedCount,
+            'challenge'      => $candidates[0],
         ]);
     }
 }
