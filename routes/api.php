@@ -27,22 +27,13 @@ Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::patch('/user/password', [AuthController::class, 'updatePassword']);
-    
+
     Route::get('/exercises', [ExerciseController::class, 'index']);
     Route::post('/exercises', [ExerciseController::class, 'store']);
     Route::get('/exercises/{id}', [ExerciseController::class, 'show']);
     Route::patch('/exercises/{id}', [ExerciseController::class, 'update']);
     Route::delete('/exercises/{id}', [ExerciseController::class, 'destroy']);
 
-      // Sync challenges from GitHub
-    Route::post('/challenges/sync', [ChallengeController::class, 'sync']);
-
-    // List all challenges
-    Route::get('/challenges', [ChallengeController::class, 'index']);
-
-    // Mark as completed
-    Route::post('/challenges/{id}/complete', [ChallengeController::class, 'complete']);
-
-    // Suggest an uncompleted challenge
-Route::get('/challenges/suggest', [ChallengeController::class, 'suggest']);
+    Route::get('/challenges/search',  [ChallengeController::class, 'search']);
+    Route::get('/challenges/suggest', [ChallengeController::class, 'suggest']);;
 });
