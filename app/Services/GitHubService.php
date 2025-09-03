@@ -25,6 +25,41 @@ class GitHubService
         return Http::withHeaders($headers);
     }
 
+    protected function fetchMarkdownBody(?string $downloadUrl): ?string
+    {
+        if (!$downloadUrl) return null;
+        $resp = $this->client()->get($downloadUrl);
+        return $resp->successful() ? (string) $resp->body() : null;
+    }
+
+    protected function parseDifficultyFromContent(string $md): ?string
+    {
+        // Explicit labels
+        if (preg_match('/difficulty\s*:\s*(easy|medium|hard)/i', $md, $m)) return strtolower($m[1]);
+        if (preg_match('/^#+\s*(easy|medium|hard)\b/im', $md, $m)) return strtolower($m[1]);
+
+        // Heuristics
+        $low = strtolower($md);
+        $hard   = ['dynamic programming','graph','dijkstra','suffix array','segment tree','max flow','bitmask'];
+        $medium = ['binary search','two pointers','backtracking','recursion','hash map','bfs','dfs','greedy'];
+        $easy   = ['fizzbuzz','palindrome','two sum','reverse string'];
+
+        foreach ($hard as $k)   if (str_contains($low, $k)) return 'hard';
+        foreach ($medium as $k) if (str_contains($low, $k)) return 'medium';
+        foreach ($easy as $k)   if (str_contains($low, $k)) return 'easy';
+
+        return null;
+    }
+
+    protected function mapTopicToLevel(array $topics): ?string
+    {
+        $t = array_map('strtolower', $topics);
+        if (in_array('beginner', $t))     return 'easy';
+        if (in_array('intermediate', $t)) return 'medium';
+        if (in_array('advanced', $t))     return 'hard';
+        return null;
+    }
+
     /**
      * Search for repositories likely containing coding challenges for a given language.
      * Returns the raw repo items from GitHub's search API.
@@ -53,7 +88,7 @@ class GitHubService
         $files = [];
 
         foreach ($roots as $root) {
-            // simple breadth-first up to one subdir level
+            // simple breadth-first with a visit cap
             $queue = [ltrim($root, '/')];
             $visited = 0;
 
@@ -78,10 +113,10 @@ class GitHubService
                     $name = strtolower($entry['name'] ?? '');
 
                     if ($type === 'file' && str_ends_with($name, '.md')) {
+                        // also fetch content to parse difficulty later
+                        $entry['__content'] = $this->fetchMarkdownBody($entry['download_url'] ?? null);
                         $files[] = $entry;
-                        if (count($files) >= $perRepoLimit) {
-                            break;
-                        }
+                        if (count($files) >= $perRepoLimit) break;
                     }
 
                     if ($type === 'dir') {
@@ -122,9 +157,7 @@ class GitHubService
         foreach ($repos as $r) {
             $owner = $r['owner']['login'] ?? null;
             $name  = $r['name'] ?? null;
-            if (!$owner || !$name) {
-                continue;
-            }
+            if (!$owner || !$name) continue;
 
             $files = $this->listChallengeFiles($owner, $name, $filesPerRepo);
 
@@ -135,12 +168,19 @@ class GitHubService
                 $title = preg_replace('/\.md$/i', '', $rawName);
                 $title = ucwords(str_replace(['-', '_'], ' ', $title));
 
+                // Combine signals: filename/path → repo topics → file content
+                $topicLevel = $this->mapTopicToLevel($r['topics'] ?? []);
+                $difficulty = $this->inferDifficultyFromName($rawName . ' ' . $path) ?? $topicLevel;
+                if (!$difficulty && !empty($f['__content'])) {
+                    $difficulty = $this->parseDifficultyFromContent($f['__content']);
+                }
+
                 $out[] = [
                     'title'       => $title,
                     'repo'        => "{$owner}/{$name}",
                     'github_url'  => $f['html_url'] ?? null,
                     'path'        => $path,
-                    'difficulty'  => $this->inferDifficultyFromName($rawName . ' ' . $path), // may be null
+                    'difficulty'  => $difficulty, // may still be null if nothing matched
                     'language'    => $language,
                 ];
             }
