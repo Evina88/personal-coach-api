@@ -48,4 +48,11 @@ class User extends Authenticatable
     {
         return $this->hasMany(Exercise::class);
     }
+
+    public function challenges()
+    {
+        return $this->belongsToMany(Challenge::class)
+            ->withPivot('completed')
+            ->withTimestamps();
+    }
 }
