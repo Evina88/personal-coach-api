@@ -82,6 +82,12 @@ Login
 
 🛠️ Patch password API
 
+🔗 User–Exercise relationship (Eloquent ORM)
+
+🗑️ Cascade delete (removes user’s exercises automatically if user is deleted)
+
+🛡️ Request validation & mass-assignment protection
+
 🧪 Fully tested with Postman requests
 
 ---
