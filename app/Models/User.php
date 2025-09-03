@@ -51,7 +51,7 @@ class User extends Authenticatable
 
     public function challenges()
     {
-        return $this->belongsToMany(Challenge::class)
+        return $this->belongsToMany(\App\Models\Challenge::class)
             ->withPivot('completed')
             ->withTimestamps();
     }

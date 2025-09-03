@@ -14,6 +14,7 @@ return new class extends Migration
         Schema::create('challenges', function (Blueprint $table) {
             $table->id();
             $table->string('title');
+            $table->string('slug')->unique();
             $table->string('difficulty')->nullable(); // easy, medium, hard
             $table->text('description')->nullable();
             $table->string('github_url')->nullable(); // link to challenge source

@@ -8,6 +8,14 @@ use Illuminate\Database\Eloquent\Model;
 class Challenge extends Model
 {
     use HasFactory;
+    protected $fillable = [
+        'title',
+        'slug',
+        'difficulty',
+        'description',
+        'github_path',
+        'github_url',
+    ];
 
     public function users()
     {
