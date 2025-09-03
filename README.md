@@ -55,13 +55,64 @@ php artisan migrate
 
 php artisan serve
 
-
+---
 
 
 Testing the API
 
+Register
+
 <img width="859" height="661" alt="image" src="https://github.com/user-attachments/assets/ac5f9bc4-cd2c-425e-a5ba-70ba559a8a63" />
 
+
+Get user
+
 <img width="851" height="650" alt="image" src="https://github.com/user-attachments/assets/c23858ef-f70c-4dd6-aa91-6ec8918c93d6" />
+
+
+Login
+
+<img width="1375" height="895" alt="image" src="https://github.com/user-attachments/assets/5a8b6055-6a38-4509-a493-7a27067b64db" />
+
+---
+
+## 🚀 Features (Day 2)
+
+✅ CRUD operations for exercises (create, read, update, delete)
+
+🛠️ Patch password API
+
+🔗 User–Exercise relationship (Eloquent ORM)
+
+🗑️ Cascade delete (removes user’s exercises automatically if user is deleted)
+
+🛡️ Request validation & mass-assignment protection
+
+🧪 Fully tested with Postman requests
+
+---
+
+Patch for updating password
+
+<img width="1402" height="807" alt="image" src="https://github.com/user-attachments/assets/cb991a51-ddd9-4554-951a-a950af6994c6" />
+
+
+Create exercice
+
+<img width="1382" height="837" alt="image" src="https://github.com/user-attachments/assets/857e9226-402c-47e2-b52b-f56959ec03b2" />
+
+
+Get exercises
+
+<img width="1377" height="895" alt="image" src="https://github.com/user-attachments/assets/b2529358-d752-4fec-a7fc-84633bf5cff7" />
+
+Patch Exercise 
+
+<img width="1367" height="850" alt="image" src="https://github.com/user-attachments/assets/59dc3d5c-c10f-4332-b841-c82ffed22b65" />
+
+---
+
+
+
 
 
