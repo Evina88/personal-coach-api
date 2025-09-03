@@ -4,6 +4,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ExerciseController;
+use App\Http\Controllers\ChallengeController;
 
 
 /*
@@ -32,4 +33,16 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/exercises/{id}', [ExerciseController::class, 'show']);
     Route::patch('/exercises/{id}', [ExerciseController::class, 'update']);
     Route::delete('/exercises/{id}', [ExerciseController::class, 'destroy']);
+
+      // Sync challenges from GitHub
+    Route::post('/challenges/sync', [ChallengeController::class, 'sync']);
+
+    // List all challenges
+    Route::get('/challenges', [ChallengeController::class, 'index']);
+
+    // Mark as completed
+    Route::post('/challenges/{id}/complete', [ChallengeController::class, 'complete']);
+
+    // Suggest an uncompleted challenge
+Route::get('/challenges/suggest', [ChallengeController::class, 'suggest']);
 });
