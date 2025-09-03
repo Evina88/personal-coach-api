@@ -35,5 +35,5 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/exercises/{id}', [ExerciseController::class, 'destroy']);
 
     Route::get('/challenges/search',  [ChallengeController::class, 'search']);
-    Route::get('/challenges/suggest', [ChallengeController::class, 'suggest']);;
+    Route::get('/challenges/suggest', [ChallengeController::class, 'suggest']);
 });
