@@ -3,10 +3,18 @@
 namespace App\Services;
 
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 class GitHubService
 {
     protected string $api = 'https://api.github.com';
+    protected bool $debug;
+
+    public function __construct()
+    {
+        // Set GITHUB_DEBUG=true in .env if you want verbose logs
+        $this->debug = (bool) config('services.github.debug', env('GITHUB_DEBUG', false));
+    }
 
     /**
      * Shared HTTP client with required headers.
@@ -14,31 +22,40 @@ class GitHubService
     protected function client()
     {
         $headers = [
-            'Accept'     => 'application/vnd.github+json',
-            'User-Agent' => 'personal-coach-api',
+            'Accept'                 => 'application/vnd.github+json',
+            'User-Agent'             => 'personal-coach-api',
+            'X-GitHub-Api-Version'   => '2022-11-28',
         ];
 
         if ($t = config('services.github.token')) {
             $headers['Authorization'] = "Bearer {$t}";
         }
 
-        return Http::withHeaders($headers);
+        return Http::withHeaders($headers)->timeout(15);
     }
 
     protected function fetchMarkdownBody(?string $downloadUrl): ?string
     {
         if (!$downloadUrl) return null;
         $resp = $this->client()->get($downloadUrl);
-        return $resp->successful() ? (string) $resp->body() : null;
+        if (!$resp->successful()) {
+            if ($this->debug) {
+                Log::warning('GitHub fetchMarkdownBody failed', [
+                    'url'    => $downloadUrl,
+                    'status' => $resp->status(),
+                    'body'   => mb_substr((string) $resp->body(), 0, 300),
+                ]);
+            }
+            return null;
+        }
+        return (string) $resp->body();
     }
 
     protected function parseDifficultyFromContent(string $md): ?string
     {
-        // Explicit labels
         if (preg_match('/difficulty\s*:\s*(easy|medium|hard)/i', $md, $m)) return strtolower($m[1]);
         if (preg_match('/^#+\s*(easy|medium|hard)\b/im', $md, $m)) return strtolower($m[1]);
 
-        // Heuristics
         $low = strtolower($md);
         $hard   = ['dynamic programming','graph','dijkstra','suffix array','segment tree','max flow','bitmask'];
         $medium = ['binary search','two pointers','backtracking','recursion','hash map','bfs','dfs','greedy'];
@@ -62,12 +79,14 @@ class GitHubService
 
     /**
      * Search for repositories likely containing coding challenges for a given language.
-     * Returns the raw repo items from GitHub's search API.
      */
     public function searchChallengeRepos(string $language, int $limit = 10): array
     {
-        // Stars filter avoids very low-signal repos; tweak as needed
-        $q = sprintf('(kata OR challenge OR exercises) language:%s stars:>5', $language);
+        // Broader, more permissive query + search in name/description/readme
+        $q = sprintf(
+            '(challenge OR challenges OR kata OR katas OR exercise OR exercises) language:%s in:name,description,readme stars:>5',
+            $language
+        );
 
         $resp = $this->client()->get("{$this->api}/search/repositories", [
             'q'        => $q,
@@ -76,11 +95,26 @@ class GitHubService
             'per_page' => $limit,
         ]);
 
-        return $resp->successful() ? ($resp->json('items') ?? []) : [];
+        if (!$resp->successful()) {
+            if ($this->debug) {
+                Log::warning('GitHub repo search failed', [
+                    'status' => $resp->status(),
+                    'body'   => mb_substr((string) $resp->body(), 0, 300),
+                    'q'      => $q,
+                ]);
+            }
+            return [];
+        }
+
+        $items = $resp->json('items') ?? [];
+        if ($this->debug) {
+            Log::info('GitHub repo search ok', ['count' => count($items)]);
+        }
+        return $items;
     }
 
     /**
-     * Scan common directories in a repo and collect Markdown files (one level deep).
+     * Scan common directories in a repo and collect Markdown files (one level deep, visit-capped).
      */
     public function listChallengeFiles(string $owner, string $repo, int $perRepoLimit = 10): array
     {
@@ -88,7 +122,6 @@ class GitHubService
         $files = [];
 
         foreach ($roots as $root) {
-            // simple breadth-first with a visit cap
             $queue = [ltrim($root, '/')];
             $visited = 0;
 
@@ -100,6 +133,13 @@ class GitHubService
                 $visited++;
 
                 if (!$resp->successful()) {
+                    if ($this->debug) {
+                        Log::notice('GitHub contents fetch failed', [
+                            'url'    => $url,
+                            'status' => $resp->status(),
+                            'body'   => mb_substr((string) $resp->body(), 0, 200),
+                        ]);
+                    }
                     continue;
                 }
 
@@ -113,7 +153,6 @@ class GitHubService
                     $name = strtolower($entry['name'] ?? '');
 
                     if ($type === 'file' && str_ends_with($name, '.md')) {
-                        // also fetch content to parse difficulty later
                         $entry['__content'] = $this->fetchMarkdownBody($entry['download_url'] ?? null);
                         $files[] = $entry;
                         if (count($files) >= $perRepoLimit) break;
@@ -125,17 +164,18 @@ class GitHubService
                 }
             }
 
-            if (count($files) >= $perRepoLimit) {
-                break;
-            }
+            if (count($files) >= $perRepoLimit) break;
+        }
+
+        if ($this->debug) {
+            Log::info('GitHub contents collected', [
+                'owner' => $owner, 'repo' => $repo, 'files' => count($files)
+            ]);
         }
 
         return $files;
     }
 
-    /**
-     * Best-effort difficulty guess from filename or path.
-     */
     protected function inferDifficultyFromName(string $filenameOrPath): ?string
     {
         $low = strtolower($filenameOrPath);
@@ -146,13 +186,16 @@ class GitHubService
     }
 
     /**
-     * High-level helper: for a language, return a normalized list of challenge items
-     * discovered across multiple popular repos.
+     * For a language, return normalized list of challenge items discovered across multiple repos.
      */
     public function findChallengesByLanguage(string $language, int $repoLimit = 3, int $filesPerRepo = 5): array
     {
         $repos = $this->searchChallengeRepos($language, $repoLimit);
-        $out   = [];
+        if ($this->debug) {
+            Log::info('findChallengesByLanguage repos', ['language' => $language, 'repos' => count($repos)]);
+        }
+
+        $out = [];
 
         foreach ($repos as $r) {
             $owner = $r['owner']['login'] ?? null;
@@ -168,7 +211,6 @@ class GitHubService
                 $title = preg_replace('/\.md$/i', '', $rawName);
                 $title = ucwords(str_replace(['-', '_'], ' ', $title));
 
-                // Combine signals: filename/path → repo topics → file content
                 $topicLevel = $this->mapTopicToLevel($r['topics'] ?? []);
                 $difficulty = $this->inferDifficultyFromName($rawName . ' ' . $path) ?? $topicLevel;
                 if (!$difficulty && !empty($f['__content'])) {
@@ -180,10 +222,14 @@ class GitHubService
                     'repo'        => "{$owner}/{$name}",
                     'github_url'  => $f['html_url'] ?? null,
                     'path'        => $path,
-                    'difficulty'  => $difficulty, // may still be null if nothing matched
+                    'difficulty'  => $difficulty,
                     'language'    => $language,
                 ];
             }
+        }
+
+        if ($this->debug) {
+            Log::info('findChallengesByLanguage out', ['language' => $language, 'count' => count($out)]);
         }
 
         return $out;
